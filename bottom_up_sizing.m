@@ -24,40 +24,41 @@ function [vehicle_sizing] = bottom_up_sizing(solid_prop_mass, liquid_prop_mass, 
     m2ft = 3.28084;
 
     solid_prop_mass = solid_prop_mass*1.01;
-    liquid_prop_mass = liquid_prop_mass*1.03;
+    liquid_prop_mass = liquid_prop_mass*1.027;
     
     %%Props Dimensional Calcs
     %solid propellant & liner
-    solid_prop_density = 1909.8;
-    grain_cutout_percent = 1;
+    solid_prop_density = 1763.66;
+    
+    %solid_prop_density = 1909.8;
+    grain_cutout_percent = 10;
     solid_volume = (1+0.01*grain_cutout_percent)*(solid_prop_mass/solid_prop_density);
     [solid_dSA, solid_dH, solid_dV] = dome(sqrt(2), Din);
-    solid_cyl_len = (solid_volume-2*solid_dV)/(pi*(Din/2)^2);
-    grain_cutout_radius = sqrt(((0.01*grain_cutout_percent)*solid_prop_mass/solid_prop_density)/((solid_cyl_len+2*solid_dH)*pi));
-    Izz_solid_prop = 2*((2/5)*solid_dV*solid_prop_density*(Din/2)^2) + (1/2)*(solid_volume-2*solid_dV)*solid_prop_density*((Din/2)^2- grain_cutout_radius^2);
-    first_stage.solidprop.dims = [solid_cyl_len+2*solid_dH, solid_prop_mass, Izz_solid_prop,0, solid_dH+solid_cyl_len/2];
+    solid_cyl_len = (solid_volume-solid_dV)/(pi*(Din/2)^2);
+    grain_cutout_radius = sqrt((solid_volume - solid_prop_mass/solid_prop_density)/(pi*(solid_cyl_len + solid_dH)));
+    Izz_solid_prop = (solid_prop_mass/2)*((Din/2)^2+grain_cutout_radius^2);
+    first_stage.solidprop.dims = [solid_cyl_len+solid_dH, solid_prop_mass, Izz_solid_prop,0, solid_dH+solid_cyl_len/2];
 
     vehicle_sizing.dH.sol = solid_dH;
 
     %first_stage_insulation
-    insulation_thickness = 0.0035;
+    insulation_thickness = 0.0127;
     first_stage.insl.mat = material(7); %insulation;
-    insl_cyl_mass = solid_cyl_len*pi*(Din)*insulation_thickness*first_stage.insl.mat(1);
-    insl_dome_mass = 2*solid_dSA*insulation_thickness*first_stage.insl.mat(1);
-    first_stage.insl.dims = [solid_cyl_len+2*solid_dH,2*insl_dome_mass + insl_cyl_mass, 0,insulation_thickness,solid_dH+solid_cyl_len/2];
+    insl_dome_mass = solid_dSA*insulation_thickness*first_stage.insl.mat(1);
+    first_stage.insl.dims = [solid_dH,insl_dome_mass, 0,insulation_thickness,solid_dH/2];
 
-
-    apx_sol_t = 0.0035; %approximate thickness for solid casing
+    apx_sol_t = 0.0042; %approximate thickness for solid casing
     [solid2_dSA, solid2_dH, solid2_dV] = dome(sqrt(2), Din+2*insulation_thickness);
     first_stage.solidcasing.mat = material(6); %carbon fiber #2
-    sol_casing_cyl_mass = solid_cyl_len*pi*(Din+insulation_thickness*2)*apx_sol_t*first_stage.solidcasing.mat(1);
+    sol_casing_cyl_mass = solid_cyl_len*pi*(Din)*apx_sol_t*first_stage.solidcasing.mat(1);
     sol_casing_dome_mass = 2*solid2_dSA*apx_sol_t*first_stage.solidcasing.mat(1);
     sol_casing_mass = sol_casing_cyl_mass+sol_casing_dome_mass;
-    first_stage.solidcasing.dims = [solid_cyl_len+2*solid2_dH,sol_casing_mass,(pi/64)*((Din+2*apx_sol_t+2*insulation_thickness)^4-(Din+2*insulation_thickness)^4), apx_sol_t,solid2_dH+solid_cyl_len/2];
-    solid2_dSA*2 + solid_cyl_len*pi*(Din + 0.012)
+    first_stage.solidcasing.dims = [solid_cyl_len+2*solid2_dH,sol_casing_mass,(pi/64)*((Din+2*apx_sol_t)^4-(Din)^4), apx_sol_t,solid2_dH+solid_cyl_len/2];
+    %solid2_dSA*2 + solid_cyl_len*pi*(Din + 0.012)
 
     %liquid propellant
-    O2F = 1.275;
+    O2F = 1.325;
+    %O2F = 1.275;
     oxidizer_mass = (O2F)/(O2F+1)*liquid_prop_mass;
     fuel_mass = 1/(O2F+1)*liquid_prop_mass;
     ox_density = 1440; %N2O4
@@ -67,7 +68,7 @@ function [vehicle_sizing] = bottom_up_sizing(solid_prop_mass, liquid_prop_mass, 
     ox_volume = oxidizer_mass/ox_density;
     fuel_volume = fuel_mass/fuel_density;
     %assuming ox on top, and common dome goes concave-up
-    [liquid_dSA, liquid_dH, liquid_dV] = dome(2, Din);
+    [liquid_dSA, liquid_dH, liquid_dV] = dome(sqrt(2), Din);
     if fuel_volume*(1+0.01*ullage_oxpercent) < 2*liquid_dV
         fuel_tank_vol = 2*liquid_dV;
         true_fuel_ullage = (2*liquid_dV/fuel_volume - 1);
@@ -76,7 +77,7 @@ function [vehicle_sizing] = bottom_up_sizing(solid_prop_mass, liquid_prop_mass, 
         fuel_tank_vol = (1 + 0.01*ullage_fuelpercent)*fuel_volume;
         fuel_cyl_len = (fuel_tank_vol-2*liquid_dV)/(pi*(Din/2)^2);
     end
-    ox_tank_vol = (1 + 0.01*ullage_oxpercent)*fuel_volume;
+    ox_tank_vol = (1 + 0.01*ullage_oxpercent)*ox_volume;
     ox_cyl_len = ox_tank_vol/(pi*(Din/2)^2);
     second_stage.ox.dims = [0,oxidizer_mass,0,0,liquid_dH];
     second_stage.fuel.dims = [0,fuel_mass,0,0,liquid_dH + fuel_cyl_len/2];
@@ -91,14 +92,9 @@ function [vehicle_sizing] = bottom_up_sizing(solid_prop_mass, liquid_prop_mass, 
     liq_tank_mass = 3*liq_dome_mass+liq_fuelcyl_mass+liq_oxcyl_mass;
     casing_CoM = ((liq_dome_mass*liquid_dH/2) + liq_dome_mass*(liquid_dH+ox_cyl_len+liquid_dH/2) + liq_oxcyl_mass*(liquid_dH+ox_cyl_len/2) + liq_fuelcyl_mass*(fuel_cyl_len/2 + 2*liquid_dH + ox_cyl_len) + liq_dome_mass*(liquid_dH/2 + fuel_cyl_len + 2*liquid_dH + ox_cyl_len))/liq_tank_mass;
     second_stage.liqcasing.dims = [liq_tank_len, liq_tank_mass, (pi/64)*((Din+2*apx_liq_t)^4-Din^4), apx_liq_t, casing_CoM];
-    
-    liquid_dH
-    fuel_cyl_len
-    ox_cyl_len
-
 
     %aft-skirt and engine
-    first_stage.engine.dims = [0.23241+0.15, 7,0,0,0.1];
+    first_stage.engine.dims = [0.2932176, 7,0,0,0.1];
     apx_aftskirt_t = 0.001;
     aftskirt_len = solid_dH + first_stage.engine.dims(1)/4;
     first_stage.aftskirt.mat = material(1); %aluminum
@@ -106,26 +102,30 @@ function [vehicle_sizing] = bottom_up_sizing(solid_prop_mass, liquid_prop_mass, 
     aftskirt_mass = aftskirt_len*pi*Din*apx_aftskirt_t*first_stage.aftskirt.mat(1) + apx_fin_mass;
     first_stage.aftskirt.dims = [aftskirt_len, aftskirt_mass, (pi/64)*((Din+2*apx_aftskirt_t)^4-Din^4), apx_aftskirt_t, solid_dH + first_stage.engine.dims(1)/8];
     
-    first_stage.avgnc.dims = [0.1,10,0,0,0]; %approximate avionics and gnc mass
+    first_stage.avgnc.dims = [0.1,1.81437 + 1.67 + 3.62874 + 12.247,0,0,0]; %approximate avionics and gnc mass
+
+    insl_aftskirt_mass = (Din*pi*aftskirt_len)*insulation_thickness*first_stage.insl.mat(1);
+    %first_stage.insl.dims = first_stage.insl.dims + [aftskirt_len-solid_dH,insl_aftskirt_mass, 0,0,aftskirt_len/4];
+
     
     %interstage + wiring runners + liquid engine
-    second_stage.engine.dims = [0.7623+0.15, 8,0,0,0.2];
+    second_stage.engine.dims = [0.5297+0.15, 8,0,0,0.2];
     
     apx_interstage_t = 0.001;
     interstage_len = (liquid_dH + second_stage.engine.dims(1) + solid_dH);
-    first_stage.interstage.mat = material(1);
+    first_stage.interstage.mat = material(6);
     interstage_mass = interstage_len*pi*Din*apx_interstage_t*first_stage.interstage.mat(1);
     first_stage.interstage.dims = [interstage_len, interstage_mass, (pi/64)*((Din+2*apx_interstage_t)^4-Din^4), apx_interstage_t, interstage_len/2];
     
-    second_stage.wiringgnc.dims = [interstage_len/2 + second_stage.liqcasing.dims(1), 9, 0, 0, 0.5*(interstage_len/2 + second_stage.liqcasing.dims(1))];%FIND IZZ - use cylinders + parallel axis thm
+    second_stage.wiringgnc.dims = [interstage_len/2 + second_stage.liqcasing.dims(1), 1.67 + 2.49476 + 0.453592, 0, 0, 0.5*(interstage_len/2 + second_stage.liqcasing.dims(1))];%FIND IZZ - use cylinders + parallel axis thm
     
     vehicle_sizing.dH.liq = liquid_dH;
 
     %payload fairing + PAF + payload - finalize when we know final design of PLF
     apx_PLF_t = 0.001;
-    first_stage.PLF.dims = [0.5, 7, (pi/64)*((Din+2*apx_PLF_t)^4-Din^4),apx_PLF_t,0.35];
+    first_stage.PLF.dims = [0.5, 5, (pi/64)*((Din+2*apx_PLF_t)^4-Din^4),apx_PLF_t,0.35];
     first_stage.PLF.mat = material(1);%aluminum
-    second_stage.PAF.dims = [liquid_dH,3,0,0,0.01]; %use plate Izz? 2 kg for MLB
+    second_stage.PAF.dims = [liquid_dH,3+1,0,0,0.01]; %use plate Izz? 2 kg for MLB, 1.68 for flight computer
     second_stage.payload.dims = [0.3048, 45.3592, 0,0,0.3048/2 ]; %use cube Izz?
     
     %%Full Rocket Mass & CG Calcs
@@ -138,7 +138,7 @@ function [vehicle_sizing] = bottom_up_sizing(solid_prop_mass, liquid_prop_mass, 
     total_length = first_stage_length + second_stage_length;
     
     first_stage_structural_ratio = (first_stage_mass - first_stage.solidprop.dims(2)/1.01)/first_stage_mass;
-    second_stage_structural_ratio = (second_stage_mass - (second_stage.ox.dims(2)+second_stage.fuel.dims(2))/1.02 - second_stage.payload.dims(2))/(second_stage_mass - second_stage.payload.dims(2));
+    second_stage_structural_ratio = (second_stage_mass - (second_stage.ox.dims(2)+second_stage.fuel.dims(2))/1.027 - second_stage.payload.dims(2))/(second_stage_mass - second_stage.payload.dims(2));
     
     first_stage.PLF.dims(6)     =   first_stage.PLF.dims(5);
     second_stage.payload.dims(6)=  second_stage.payload.dims(5)+first_stage.PLF.dims(1) - 1/m2ft;
@@ -152,7 +152,7 @@ function [vehicle_sizing] = bottom_up_sizing(solid_prop_mass, liquid_prop_mass, 
     first_stage.solidcasing.dims(6)= second_stage_length + first_stage.solidcasing.dims(5);
     first_stage.insl.dims(6)= second_stage_length + first_stage.insl.dims(5);
     first_stage.solidprop.dims(6) = second_stage_length + first_stage.solidprop.dims(5);
-    first_stage.aftskirt.dims(6)=   second_stage_length + first_stage.solidcasing.dims(1) - solid_dH;
+    first_stage.aftskirt.dims(6)=   second_stage_length + first_stage.solidcasing.dims(1) - solid_dH + first_stage.aftskirt.dims(5);
     first_stage.engine.dims(6)=     second_stage_length + first_stage.solidcasing.dims(1) + first_stage.engine.dims(5);
     first_stage.avgnc.dims(6)=      second_stage_length + first_stage.solidcasing.dims(1);
 

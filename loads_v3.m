@@ -39,8 +39,12 @@ psi2Pa = 6894.76;
 
 
 %initial variables for general sizing
-solid_prop_mass = 1655.3205;
-liquid_prop_mass = 272.702;
+%solid_prop_mass = 1508.0927; ORIGINAL
+%liquid_prop_mass = 246.6531; ORIGINAL
+
+solid_prop_mass = 1278.8174; 
+liquid_prop_mass = 308.9071; 
+
 Din = 0.58;
 vehicle_sizing = bottom_up_sizing(solid_prop_mass,liquid_prop_mass,Din);
 
@@ -121,7 +125,7 @@ nodeloc = [0,Lels(1),sum(Lels(1:2)),sum(Lels(1:3)),sum(Lels(1:4)),sum(Lels(1:5))
 
 %%load cases
 %PICK YOUR LOAD CASE!! :
-load_case = 3;
+load_case = 2;
 
 if load_case == 1 %max q
   %body forces
@@ -129,11 +133,12 @@ if load_case == 1 %max q
     nz = 0.3;
 
     %distributed load parameters
-    alpha = 75;
+    alpha = 31;
     beta = 90;
-    fpa = 55;
+    fpa = 0;
 
-    q = 9530.21; %Pa
+    qpsi = 3.3;
+    q = qpsi*6894.76; %Pa
     alt = 13050; %m
     atm = atmo(alt);
     maxqv = 277.226824974998; %m/s
@@ -187,22 +192,23 @@ if load_case == 1 %max q
                      40,0;];
 end
 
-if load_case == 2 %PLEASE FIX
+if load_case == 2 %maxqa
   %body forces
     nx = 1.6;
     nz = 0.3;
 
     %distributed load parameters
-    alpha = 80;
+    alpha = 34.7;
     beta = 90;
-    fpa = 60;
+    fpa = 0;
 
-    qalpha = 14267.1;
+    qapsi = 1.95;
+    qalpha = qapsi*6894.76;
     q = qalpha/(alpha*pi/180); %Pa
-    alt = 13110; %m
+    alt = 16500; %m
     atm = atmo(alt);
-    maxqv = 277.226824974998; %m/s
-    machnum = maxqv/sqrt(1.4*287*atm.T);
+    machnum = 1.6;
+    maxqv = machnum*sqrt(1.4*287*atm.T);
     CD = CD(machnum, alpha);
     shear_aero = CD*q*sind(alpha); %Pa/m^2
     dist_aeroshear = shear_aero*Din; %converts to Pa/m - force per unit length along the beam
@@ -333,7 +339,7 @@ if load_case == 4 %carriage in transit
     alt = 10668; %m
     atm = atmo(alt);
     maxqv = 750*0.44704;
-    machnum = maxqv*sqrt(1.4*287*atm.T); %m/s
+    machnum = maxqv/sqrt(1.4*287*atm.T); %m/s
     q = 1/2*atm.rho*maxqv^2;
     CD = CD(machnum, alpha);
     shear_aero = CD*q*sind(alpha); %Pa/m^2
@@ -455,12 +461,12 @@ for i = 1:10
     load_dist_aero = shearmoment(dist_aeroshear,Nt_x,Lels(i),nodeloc(i));
     load_dist_wind = shearmoment(dist_windshear,Nt_x,Lels(i),nodeloc(i));
 
-    Q_ar(5*i-4)=Q_ar(5*i-4) + load_dist_aero(1);
-    Q_ar(5*i-3)=Q_ar(5*i-3) + load_dist_aero(2);
+    Q_ar(5*i-3)=Q_ar(5*i-3) + load_dist_aero(1);
+    Q_ar(5*i-2)=Q_ar(5*i-2) + load_dist_aero(2);
     Q_ar(5*i+2)=Q_ar(5*i+2) + load_dist_aero(3);
     Q_ar(5*i+3)=Q_ar(5*i+3) + load_dist_aero(4);
-    Q_ar(5*i-2)=Q_ar(5*i-2) + load_dist_wind(1);
-    Q_ar(5*i-1)=Q_ar(5*i-1) + load_dist_wind(2);
+    Q_ar(5*i-1)=Q_ar(5*i-1) + load_dist_wind(1);
+    Q_ar(5*i)  =Q_ar(5*i) + load_dist_wind(2);
     Q_ar(5*i+4)=Q_ar(5*i+4) + load_dist_wind(3);
     Q_ar(5*i+5)=Q_ar(5*i+5) + load_dist_wind(4);
 end
@@ -508,12 +514,17 @@ Q_sol(beta) = Qb;
 q_sol(alpha) = qa;
 q_sol(beta) = qb;
 
-
 zero_arr = zeros(10,1);
 vx_zarray = sym(zero_arr);
 vx_yarray = sym(zero_arr);
 axial_disp_array = sym(zero_arr);
 
+sheary_nodes = [Q_sol(2),Q_sol(7),Q_sol(12),Q_sol(17),Q_sol(22),Q_sol(27),Q_sol(32),Q_sol(37),Q_sol(42),Q_sol(47),Q_sol(52)];
+shearz_nodes = [Q_sol(4),Q_sol(9),Q_sol(14),Q_sol(19),Q_sol(24),Q_sol(29),Q_sol(34),Q_sol(39),Q_sol(44),Q_sol(49),Q_sol(54)];
+momentz_nodes = [Q_sol(3),Q_sol(8),Q_sol(13),Q_sol(18),Q_sol(23),Q_sol(28),Q_sol(33),Q_sol(38),Q_sol(43),Q_sol(48),Q_sol(53)];
+momenty_nodes = [Q_sol(5),Q_sol(10),Q_sol(15),Q_sol(20),Q_sol(25),Q_sol(30),Q_sol(35),Q_sol(40),Q_sol(45),Q_sol(50),Q_sol(55)];
+
+save('Shear_Moments.mat','nodeloc','sheary_nodes','shearz_nodes','momentz_nodes','momenty_nodes')
 
 %METRIC OR IMPERIAL?
 metric = 0; %metric = 1, plot metric. metric = 0, plot imperial
